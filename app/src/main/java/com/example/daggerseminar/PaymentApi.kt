@@ -1,20 +1,28 @@
 package com.example.daggerseminar
 
+import android.content.Context
+import com.example.daggerseminar.di.AnotherUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.math.BigDecimal
-import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 /**
  * @author a.s.korchagin
  */
-class PaymentApi {
-    private val url: String = "tinkoff.payment.ru"
-    private val client: OkHttpClient = OkHttpClient().newBuilder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .build()
+interface PaymentApi {
 
-    fun pay(amount: BigDecimal?) {
+    fun pay(amount: BigDecimal?)
+}
+class PaymentApiImpl @Inject constructor(
+    private val context: Context,
+    private val url: String,
+    @AnotherUrl
+    private val anotherUrl: String,
+    private val client: OkHttpClient
+) : PaymentApi {
+
+    override fun pay(amount: BigDecimal?) {
         val request: Request = getRequest()
         client.newCall(request).execute()
     }
