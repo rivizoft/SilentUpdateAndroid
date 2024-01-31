@@ -22,7 +22,7 @@ class AppUpdater(
     private val assets = context.assets
     private val installer: PackageInstaller by lazy { context.packageManager.packageInstaller }
 
-    suspend fun update()  {
+    fun update()  {
         val fileName = updateAppFileName()
         val length = assetFileLength()
         assets.open(fileName).use { apkStream ->

@@ -13,9 +13,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 
 class MainActivity : AppCompatActivity() {
@@ -48,9 +45,7 @@ class MainActivity : AppCompatActivity() {
             }
             setOnClickListener {
                 it.visibility = View.GONE
-                lifecycleScope.launch(Dispatchers.Main) {
-                    appUpdater.update()
-                }
+                appUpdater.update()
             }
         }
 
