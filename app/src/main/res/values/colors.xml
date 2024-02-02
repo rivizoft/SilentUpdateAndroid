@@ -10,4 +10,6 @@
     <color name="uikit_n8">#428bf9</color>
     <color name="uikit_n9">#ffdd2d</color>
     <color name="main_yellow">#ffdd2d</color>
+    <color name="red">#FF4500</color>
+    <color name="green">#A0DB8E</color>
 </resources>
