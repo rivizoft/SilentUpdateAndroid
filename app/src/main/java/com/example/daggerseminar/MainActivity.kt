@@ -4,8 +4,10 @@ import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -17,18 +19,57 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 
 class MainActivity : AppCompatActivity() {
 
     private val appUpdater: AppUpdater by lazy { AppUpdater(this) }
 
+    private val viewModel: MainViewModel by viewModels<MainViewModel>()
+
+    private val broadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            viewModel.backgroundModeChanged(allowInBackgroundMode())
+        }
+    }
+
+    private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        showErrorToast("Пермишн получен, статус: $it")
+
+        val isWorkingInBg = allowInBackgroundMode()
+
+        findViewById<TextView>(R.id.inBackgroundWorkAllowedText).apply {
+            visibility = if (isWorkingInBg) View.VISIBLE else View.GONE
+        }
+        findViewById<TextView>(R.id.inBackgroundWorkRestrictedText).apply {
+            visibility = if (isWorkingInBg.not()) View.VISIBLE else View.GONE
+        }
+        findViewById<TextView>(R.id.addToBackgroundButton).apply {
+            text = if (isWorkingInBg) {
+                "Убрать из фоновой работы"
+            } else {
+                "Добавить в фоновую работу"
+            }
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        this.registerReceiver(
+            broadcastReceiver,
+            IntentFilter("android.os.action.POWER_SAVE_WHITELIST_CHANGED")
+        )
+
         setContentView(R.layout.activity_main)
 
         findViewById<TextView>(R.id.textView).apply {
@@ -51,6 +92,22 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.installButton).apply {
             setOnClickListener {
                 appUpdater.update()
+            }
+        }
+
+        val isWorkingInBg = allowInBackgroundMode()
+
+        findViewById<TextView>(R.id.inBackgroundWorkAllowedText).apply {
+            visibility = if (isWorkingInBg) View.VISIBLE else View.GONE
+        }
+        findViewById<TextView>(R.id.inBackgroundWorkRestrictedText).apply {
+            visibility = if (isWorkingInBg.not()) View.VISIBLE else View.GONE
+        }
+        findViewById<TextView>(R.id.addToBackgroundButton).apply {
+            text = if (isWorkingInBg) {
+                "Убрать из фоновой работы"
+            } else {
+                "Добавить в фоновую работу"
             }
         }
 
@@ -87,26 +144,36 @@ class MainActivity : AppCompatActivity() {
                 createNotificationChannel()
             }
         }
+
+        viewModel.backgroundState.observe(this) { added ->
+            findViewById<TextView>(R.id.inBackgroundWorkAllowedText).apply {
+                visibility = if (added) View.VISIBLE else View.GONE
+            }
+            findViewById<TextView>(R.id.inBackgroundWorkRestrictedText).apply {
+                visibility = if (added.not()) View.VISIBLE else View.GONE
+            }
+            findViewById<TextView>(R.id.addToBackgroundButton).apply {
+                text = if (added) {
+                    "Убрать из фоновой работы"
+                } else {
+                    "Добавить в фоновую работу"
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val worker = PeriodicWorkRequestBuilder<BackgroundWorker>(1, TimeUnit.MINUTES, 15, TimeUnit.MINUTES)
+            .addTag("updater")
+            .setInitialDelay(30, TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueue(worker)
     }
 
     override fun onResume() {
         super.onResume()
-
-        val isWorkingInBg = allowInBackgroundMode()
-
-        findViewById<TextView>(R.id.inBackgroundWorkAllowedText).apply {
-            visibility = if (isWorkingInBg) View.VISIBLE else View.GONE
-        }
-        findViewById<TextView>(R.id.inBackgroundWorkRestrictedText).apply {
-            visibility = if (isWorkingInBg.not()) View.VISIBLE else View.GONE
-        }
-        findViewById<TextView>(R.id.addToBackgroundButton).apply {
-            text = if (isWorkingInBg) {
-                "Убрать из фоновой работы"
-            } else {
-                "Добавить в фоновую работу"
-            }
-        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
