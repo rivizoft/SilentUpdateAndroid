@@ -23,41 +23,22 @@ import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
+import androidx.work.multiprocess.RemoteWorkManager
 import java.util.concurrent.TimeUnit
 
 
 class MainActivity : AppCompatActivity() {
 
-    private val appUpdater: AppUpdater by lazy { AppUpdater(this) }
+    private val appUpdater: AppUpdater by lazy { AppUpdater(applicationContext) }
 
     private val viewModel: MainViewModel by viewModels<MainViewModel>()
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             viewModel.backgroundModeChanged(allowInBackgroundMode())
-        }
-    }
-
-    private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        showErrorToast("Пермишн получен, статус: $it")
-
-        val isWorkingInBg = allowInBackgroundMode()
-
-        findViewById<TextView>(R.id.inBackgroundWorkAllowedText).apply {
-            visibility = if (isWorkingInBg) View.VISIBLE else View.GONE
-        }
-        findViewById<TextView>(R.id.inBackgroundWorkRestrictedText).apply {
-            visibility = if (isWorkingInBg.not()) View.VISIBLE else View.GONE
-        }
-        findViewById<TextView>(R.id.addToBackgroundButton).apply {
-            text = if (isWorkingInBg) {
-                "Убрать из фоновой работы"
-            } else {
-                "Добавить в фоновую работу"
-            }
         }
     }
 
@@ -164,16 +145,24 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        val worker = PeriodicWorkRequestBuilder<BackgroundWorker>(1, TimeUnit.MINUTES, 15, TimeUnit.MINUTES)
-            .addTag("updater")
-            .setInitialDelay(30, TimeUnit.SECONDS)
+
+        val worker =
+            PeriodicWorkRequestBuilder<BackgroundWorker>(1, TimeUnit.MINUTES, 15, TimeUnit.MINUTES)
+                .addTag("updater-work")
+                //.setConstraints(Constraints(requiresDeviceIdle = true))
+                .build()
+
+        val worker1 = OneTimeWorkRequestBuilder<BackgroundWorker>()
+            .addTag("updater-work")
+            //.setConstraints(Constraints(requiresDeviceIdle = true))
+            .setInitialDelay(5L, TimeUnit.SECONDS)
             .build()
 
-        WorkManager.getInstance(this).enqueue(worker)
-    }
-
-    override fun onResume() {
-        super.onResume()
+        RemoteWorkManager.getInstance(this).apply {
+            cancelAllWork()
+            //enqueueUniqueWork("updater-work", ExistingWorkPolicy.REPLACE, worker1)
+            enqueueUniquePeriodicWork("updater-work", ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE, worker)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
